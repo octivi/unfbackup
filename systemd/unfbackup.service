@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026  IMAGIN sp. z o.o.
+# SPDX-FileContributor: Marcin Engelmann <mengelmann@octivi.com>
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the unfbackup UniFi OS controller backup tool.
+# https://github.com/octivi/unfbackup
+
+
+[Unit]
+Description=Download backup from UniFi controller
+After=local-fs.target network-online.target
+Wants=local-fs.target network-online.target
+
+[Service]
+Type=oneshot
+User=unfbackup
+Group=unfbackup
+WorkingDirectory=/opt/unfbackup
+EnvironmentFile=/opt/unfbackup/.env
+ExecStart=/opt/unfbackup/.venv/bin/python /opt/unfbackup/unfbackup.py
+UMask=0077
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ReadWritePaths=/var/backups/unfbackup
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources

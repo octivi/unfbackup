@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026  IMAGIN sp. z o.o.
+# SPDX-FileContributor: Marcin Engelmann <mengelmann@octivi.com>
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the unfbackup UniFi OS controller backup tool.
+# https://github.com/octivi/unfbackup
+
+[Unit]
+Description=Download backup from UniFi controller daily
+After=local-fs.target network-online.target
+Wants=local-fs.target network-online.target
+
+[Timer]
+OnCalendar=*-*-* 1:00
+RandomizedDelaySec=1h 30min
+FixedRandomDelay=true
+Persistent=true
+
+[Install]
+WantedBy=timers.target

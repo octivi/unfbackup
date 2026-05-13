@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026  IMAGIN sp. z o.o.
+# SPDX-FileContributor: Marcin Engelmann <mengelmann@octivi.com>
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the unfbackup UniFi OS controller backup tool.
+# https://github.com/octivi/unfbackup
+
+.venv/
+__pycache__/
+backup/
+
+.env

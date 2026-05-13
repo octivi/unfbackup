@@ -1,0 +1,121 @@
+---
+# SPDX-FileCopyrightText: 2025-2026  IMAGIN sp. z o.o.
+# SPDX-FileContributor: Marcin Engelmann <mengelmann@octivi.com>
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the configuration created by Octivi's DevOps team.
+# Details at https://octivi.com/devops
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-slim
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate release notes
+        id: release_notes
+        uses: octivi/release-notes-from-changelog@v1
+        with:
+          tag: ${{ github.ref_name }}
+          changelog: CHANGELOG.md
+          release_notes: release-notes.md
+
+      - name: Prepare release artifacts
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          package="unfbackup-${tag}"
+
+          mkdir -p "dist/package/${package}/systemd" dist/release
+
+          install -m 0755 unfbackup.py "dist/package/${package}/unfbackup.py"
+          install -m 0644 requirements.txt "dist/package/${package}/requirements.txt"
+          install -m 0644 .env.example "dist/package/${package}/.env.example"
+          install -m 0644 Dockerfile "dist/package/${package}/Dockerfile"
+          install -m 0644 compose.yml "dist/package/${package}/compose.yml"
+          install -m 0644 README.md "dist/package/${package}/README.md"
+          install -m 0644 LICENSE "dist/package/${package}/LICENSE"
+          install -m 0644 SECURITY.md "dist/package/${package}/SECURITY.md"
+          install -m 0644 systemd/unfbackup.service "dist/package/${package}/systemd/unfbackup.service"
+          install -m 0644 systemd/unfbackup.timer "dist/package/${package}/systemd/unfbackup.timer"
+
+          install -m 0755 unfbackup.py dist/release/unfbackup.py
+          tar -C dist/package -czf "dist/release/${package}.tar.gz" "${package}"
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist/release
+          sha256sum unfbackup.py > unfbackup.py.sha256
+          sha256sum "unfbackup-${GITHUB_REF_NAME}.tar.gz" > "unfbackup-${GITHUB_REF_NAME}.tar.gz.sha256"
+
+      - name: Append install instructions to release notes
+        run: |
+          cat <<'EOF' >> "${{ steps.release_notes.outputs.release_notes }}"
+
+          ## Install
+
+          Download the release package and verify its checksum:
+
+          ```bash
+          curl -fsSLO "https://github.com/${{ github.event.repository.owner.login }}/${{ github.event.repository.name }}/releases/download/${{ github.ref_name }}/unfbackup-${{ github.ref_name }}.tar.gz" \
+            && curl -fsSLO "https://github.com/${{ github.event.repository.owner.login }}/${{ github.event.repository.name }}/releases/download/${{ github.ref_name }}/unfbackup-${{ github.ref_name }}.tar.gz.sha256" \
+            && sha256sum -c "unfbackup-${{ github.ref_name }}.tar.gz.sha256" \
+            && tar -xzf "unfbackup-${{ github.ref_name }}.tar.gz"
+          ```
+
+          Install for systemd-based hosts:
+
+          ```bash
+          cd "unfbackup-${{ github.ref_name }}"
+          id -u unfbackup >/dev/null 2>&1 || sudo useradd --system --home-dir /opt/unfbackup --shell /usr/sbin/nologin unfbackup
+          sudo install -d -o unfbackup -g unfbackup -m 0755 /opt/unfbackup
+          sudo install -d -o unfbackup -g unfbackup -m 0700 /var/backups/unfbackup
+          sudo install -m 0755 unfbackup.py /opt/unfbackup/unfbackup.py
+          sudo python3 -m venv /opt/unfbackup/.venv
+          sudo /opt/unfbackup/.venv/bin/pip install -r requirements.txt
+          sudo install -m 0600 .env.example /opt/unfbackup/.env
+          sudo chown root:unfbackup /opt/unfbackup/.env
+          sudo chmod 0640 /opt/unfbackup/.env
+          sudo install -m 0644 systemd/unfbackup.service /etc/systemd/system/unfbackup.service
+          sudo install -m 0644 systemd/unfbackup.timer /etc/systemd/system/unfbackup.timer
+          sudo systemctl daemon-reload
+          ```
+
+          Edit `/opt/unfbackup/.env`, then enable the timer:
+
+          ```bash
+          sudo systemctl enable --now unfbackup.timer
+          ```
+
+          For Docker usage, build from the release package:
+
+          ```bash
+          cd "unfbackup-${{ github.ref_name }}"
+          docker build -t unfbackup:${{ github.ref_name }} .
+          ```
+          EOF
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: ${{ steps.release_notes.outputs.release_notes }}
+          generate_release_notes: false
+          files: |
+            ./dist/release/unfbackup.py
+            ./dist/release/unfbackup.py.sha256
+            ./dist/release/unfbackup-${{ github.ref_name }}.tar.gz
+            ./dist/release/unfbackup-${{ github.ref_name }}.tar.gz.sha256
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

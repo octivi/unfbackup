@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026  IMAGIN sp. z o.o.
+# SPDX-FileContributor: Marcin Engelmann <mengelmann@octivi.com>
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the unfbackup UniFi OS controller backup tool.
+# https://github.com/octivi/unfbackup
+
+x-unfbackup-common: &unfbackup-common
+  build:
+    context: .
+    args:
+      UNFBACKUP_UID: ${UNFBACKUP_UID:-10001}
+      UNFBACKUP_GID: ${UNFBACKUP_GID:-10001}
+  image: unfbackup:local
+  user: ${UNFBACKUP_UID:-10001}:${UNFBACKUP_GID:-10001}
+  cap_drop:
+    - ALL
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  environment:
+    UNFBACKUP_USERNAME: ${UNFBACKUP_USERNAME:?set UNFBACKUP_USERNAME in .env}
+    UNFBACKUP_PASSWORD: ${UNFBACKUP_PASSWORD:?set UNFBACKUP_PASSWORD in .env}
+    UNFBACKUP_CONTROLLER_URL: ${UNFBACKUP_CONTROLLER_URL:?set UNFBACKUP_CONTROLLER_URL in .env}
+    UNFBACKUP_DEST_DIR: /backup
+    UNFBACKUP_DEST_FILENAME: ${UNFBACKUP_DEST_FILENAME:-}
+    UNFBACKUP_ALLOW_INSECURE_TLS: ${UNFBACKUP_ALLOW_INSECURE_TLS:-}
+    UNFBACKUP_INTERVAL: ${UNFBACKUP_INTERVAL:-1d}
+  volumes:
+    - type: bind
+      source: ${UNFBACKUP_OUTPUT_DIR:-./backup}
+      target: /backup
+
+services:
+  unfbackup:
+    <<: *unfbackup-common
+    profiles:
+      - manual
+    restart: 'no'
+
+  scheduler:
+    <<: *unfbackup-common
+    restart: unless-stopped
+    command:
+      - sh
+      - -ec
+      - |
+        while true; do
+          python /opt/unfbackup/unfbackup.py || echo "unfbackup run failed" >&2
+          sleep "$${UNFBACKUP_INTERVAL}"
+        done
