@@ -5,16 +5,11 @@
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org/)
 [![Semantic Versioning](https://img.shields.io/badge/SemVer-2.0.0-blue)](https://semver.org/spec/v2.0.0.html)
 
-`unfbackup` is a small Python script that logs in to a UniFi OS controller, downloads a backup file,
-and stores it in a destination directory.
+`unfbackup` is a small Python tool that logs in to a UniFi OS controller, downloads the controller
+backup file, and stores it in a destination directory.
 
-The script uses fixed controller paths:
-
-- login: `POST /api/auth/login`
-- download: `GET /api/backup/download`
-- logout: `POST /api/auth/logout`
-- login body: `{"username":"...","password":"..."}`
-- logout CSRF: `X-CSRF-Token` returned by login and sent to the logout request
+It can be run directly with Python, in Docker, through Docker Compose, or from a systemd timer. On
+success it prints the saved backup path.
 
 ## Tested Versions
 
@@ -24,7 +19,35 @@ The script has been tested on CloudKey Gen 2 with:
 - UniFi Network: `10.3.58`
 - InnerSpace: `1.3.14`
 
-## Environment
+## Quick Start
+
+The configured UniFi OS user must have the `Super Admin` role. Accounts with lower privileges cannot
+create and download the controller backup.
+
+Create a virtual environment and install dependencies:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Create the destination directory and run one backup:
+
+```sh
+mkdir -p backup
+
+UNFBACKUP_USERNAME='user' \
+UNFBACKUP_PASSWORD='secret' \
+UNFBACKUP_CONTROLLER_URL='https://controller.example.com' \
+UNFBACKUP_DEST_DIR="$PWD/backup" \
+.venv/bin/python unfbackup.py
+```
+
+`UNFBACKUP_CONTROLLER_URL` must be an `https://` URL. The destination directory must already exist.
+Backup filenames come from the controller's `Filename` header and are saved with a
+`YYYY.MM.DD-HHMMSS-` prefix unless `UNFBACKUP_DEST_FILENAME` is set.
+
+## Configuration
 
 Required variables:
 
@@ -42,37 +65,15 @@ Optional variables:
 UNFBACKUP_ALLOW_INSECURE_TLS='1'
 ```
 
-The configured user must have the `Super Admin` role. Accounts with lower privileges cannot create
-and download the controller backup.
+Set `UNFBACKUP_DEST_FILENAME` to store the backup under a fixed file name inside
+`UNFBACKUP_DEST_DIR`. The value must be a file name, not a path. If it is not set, the script keeps
+the timestamped naming behavior.
 
 Set `UNFBACKUP_ALLOW_INSECURE_TLS` to `1`, `true`, or `yes` to ignore TLS certificate verification
 errors. This is useful for HTTPS controllers with self-signed certificates, but it lowers connection
 security and should only be used when you trust the controller and network path.
 
-Set `UNFBACKUP_DEST_FILENAME` to store the backup under a fixed file name inside
-`UNFBACKUP_DEST_DIR`. The value must be a file name, not a path. If it is not set, the script keeps
-the default naming behavior.
-
-## Local usage
-
-Create a virtual environment and install dependencies:
-
-```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-```
-
-Run the script:
-
-```sh
-UNFBACKUP_USERNAME='user' \
-UNFBACKUP_PASSWORD='secret' \
-UNFBACKUP_CONTROLLER_URL='https://controller.example.com' \
-UNFBACKUP_DEST_DIR="$PWD/backup" \
-.venv/bin/python unfbackup.py
-```
-
-Or load variables from `.env` for a single run:
+You can load variables from `.env` for a single local run:
 
 ```sh
 (set -a; . ./.env; set +a; .venv/bin/python unfbackup.py)
@@ -81,10 +82,6 @@ Or load variables from `.env` for a single run:
 `set -a` exports variables loaded from `.env`, so the Python process can read them from the
 environment. The parentheses run the command in a subshell, so those variables do not stay in your
 current shell session after the script exits.
-
-The script prints the saved file path on success. The destination directory must already exist.
-Backup filenames come from the server's `Filename` header and are saved with a `YYYY.MM.DD-HHMMSS-`
-prefix unless `UNFBACKUP_DEST_FILENAME` is set.
 
 ## Docker
 
@@ -170,6 +167,7 @@ The shipped unit files are ready to use with these fixed paths:
 - virtualenv: `/opt/unfbackup/.venv`
 - env file: `/opt/unfbackup/.env`
 - service user: `unfbackup`
+- backup directory: `/var/backups/unfbackup`
 
 Install:
 
@@ -190,7 +188,7 @@ Create `/opt/unfbackup/.env`:
 UNFBACKUP_USERNAME=user
 UNFBACKUP_PASSWORD=secret
 UNFBACKUP_CONTROLLER_URL=https://controller.example.com
-UNFBACKUP_DEST_DIR=/var/lib/unfbackup
+UNFBACKUP_DEST_DIR=/var/backups/unfbackup
 # UNFBACKUP_DEST_FILENAME=unifi-backup.unf
 # UNFBACKUP_ALLOW_INSECURE_TLS=1
 ```
@@ -218,3 +216,13 @@ sudo journalctl -u unfbackup.service
 
 The difference from an example template is that these unit files contain real installation paths.
 They can be copied directly to `/etc/systemd/system/` when the files are installed as shown above.
+
+## Controller API Details
+
+The script uses fixed UniFi OS controller paths:
+
+- login: `POST /api/auth/login`
+- download: `GET /api/backup/download`
+- logout: `POST /api/auth/logout`
+- login body: `{"username":"...","password":"..."}`
+- logout CSRF: `X-CSRF-Token` returned by login and sent to the logout request
