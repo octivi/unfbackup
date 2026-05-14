@@ -73,10 +73,15 @@ jobs:
             && tar -xzf "unfbackup-${{ github.ref_name }}.tar.gz"
           ```
 
+          Enter the extracted release package:
+
+          ```sh
+          cd "unfbackup-${{ github.ref_name }}"
+          ```
+
           Install for systemd-based hosts:
 
-          ```bash
-          cd "unfbackup-${{ github.ref_name }}"
+          ```sh
           id -u unfbackup >/dev/null 2>&1 || sudo useradd --system --home-dir /opt/unfbackup --shell /usr/sbin/nologin unfbackup
           sudo install -d -o unfbackup -g unfbackup -m 0755 /opt/unfbackup
           sudo install -d -o unfbackup -g unfbackup -m 0700 /var/backups/unfbackup
@@ -91,15 +96,33 @@ jobs:
           sudo systemctl daemon-reload
           ```
 
-          Edit `/opt/unfbackup/.env`, then enable the timer:
+          Edit `/opt/unfbackup/.env`:
 
-          ```bash
+          ```sh
+          UNFBACKUP_USERNAME=user
+          UNFBACKUP_PASSWORD=secret
+          UNFBACKUP_CONTROLLER_URL=https://controller.example.com
+          UNFBACKUP_DEST_DIR=/var/backups/unfbackup
+          # UNFBACKUP_DEST_FILENAME=unifi-backup.unf
+          # UNFBACKUP_ALLOW_INSECURE_TLS=1
+          ```
+
+          Enable the timer:
+
+          ```sh
           sudo systemctl enable --now unfbackup.timer
+          ```
+
+          Run once manually:
+
+          ```sh
+          sudo systemctl start unfbackup.service
+          sudo journalctl -u unfbackup.service
           ```
 
           For Docker usage, build from the release package:
 
-          ```bash
+          ```sh
           cd "unfbackup-${{ github.ref_name }}"
           docker build -t unfbackup:${{ github.ref_name }} .
           ```

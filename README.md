@@ -169,20 +169,24 @@ The shipped unit files are ready to use with these fixed paths:
 - service user: `unfbackup`
 - backup directory: `/var/backups/unfbackup`
 
-Install:
+From a source checkout or extracted release package, install for systemd-based hosts:
 
 ```sh
-sudo useradd --system --home-dir /opt/unfbackup --shell /usr/sbin/nologin unfbackup
-sudo install -d -o unfbackup -g unfbackup -m 700 /opt/unfbackup /var/backups/unfbackup
+id -u unfbackup >/dev/null 2>&1 || sudo useradd --system --home-dir /opt/unfbackup --shell /usr/sbin/nologin unfbackup
+sudo install -d -o unfbackup -g unfbackup -m 0755 /opt/unfbackup
+sudo install -d -o unfbackup -g unfbackup -m 0700 /var/backups/unfbackup
 sudo install -m 0755 unfbackup.py /opt/unfbackup/unfbackup.py
 sudo python3 -m venv /opt/unfbackup/.venv
 sudo /opt/unfbackup/.venv/bin/pip install -r requirements.txt
 sudo install -m 0600 .env.example /opt/unfbackup/.env
+sudo chown root:unfbackup /opt/unfbackup/.env
+sudo chmod 0640 /opt/unfbackup/.env
 sudo install -m 0644 systemd/unfbackup.service /etc/systemd/system/unfbackup.service
 sudo install -m 0644 systemd/unfbackup.timer /etc/systemd/system/unfbackup.timer
+sudo systemctl daemon-reload
 ```
 
-Create `/opt/unfbackup/.env`:
+Edit `/opt/unfbackup/.env`:
 
 ```sh
 UNFBACKUP_USERNAME=user
@@ -193,17 +197,9 @@ UNFBACKUP_DEST_DIR=/var/backups/unfbackup
 # UNFBACKUP_ALLOW_INSECURE_TLS=1
 ```
 
-Restrict access to the env file because it contains credentials:
+Enable the timer:
 
 ```sh
-sudo chown root:unfbackup /opt/unfbackup/.env
-sudo chmod 0640 /opt/unfbackup/.env
-```
-
-Start and enable the timer:
-
-```sh
-sudo systemctl daemon-reload
 sudo systemctl enable --now unfbackup.timer
 ```
 
